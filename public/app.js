@@ -1,0 +1,19 @@
+const video = document.querySelector('#webcam');
+const canvas = document.querySelector('#canvas');
+const log = document.querySelector('#log');
+const status = document.querySelector('#status');
+const heading = document.querySelector('#heading');
+let stream, facingMode = 'environment', processing = false, unlocked = false, tapCount = 0, tapTimer, pressTimer, longPress = false, autoTimer;
+
+function setLog(message, className = '') { log.innerHTML = className ? `<span class="${className}">${message}</span>` : message; }
+function speak(text) { speechSynthesis.cancel(); const utterance = new SpeechSynthesisUtterance(text); utterance.lang = 'zh-TW'; speechSynthesis.speak(utterance); }
+async function api(path, body) { const response = await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); const data = await response.json(); if (!response.ok) throw new Error(data.error || '服務暫時無法使用'); return data; }
+async function camera(mode) { stream?.getTracks().forEach(track => track.stop()); try { stream = await navigator.mediaDevices.getUserMedia({video:{facingMode:mode},audio:false}); video.srcObject = stream; status.textContent='● 相機已就緒'; } catch (error) { setLog(`無法取得相機權限：${error.name === 'NotAllowedError' ? '請點網址左側圖示，將「相機」設為允許後重新整理。' : error.message}`); } }
+async function analyze() { if (processing || !video.videoWidth) return; processing = true; setLog('正在辨識環境…'); const ctx=canvas.getContext('2d'); canvas.width=video.videoWidth; canvas.height=video.videoHeight; ctx.drawImage(video,0,0); try { const image=canvas.toDataURL('image/jpeg',.8).split(',')[1]; const {text}=await api('/api/analyze',{image}); setLog(text,'highlight'); speak(text); } catch(error) { setLog(error.message); speak(error.message); } finally { processing=false; } }
+function getCurrentPosition() { return new Promise((resolve,reject)=>navigator.geolocation.getCurrentPosition(resolve,reject,{enableHighAccuracy:true,timeout:10000,maximumAge:0})); }
+async function places() { if(processing)return; processing=true; setLog('正在搜尋附近地點…'); try { const pos=await getCurrentPosition(); const result=await api('/api/places',{mode:'radar',latitude:pos.coords.latitude,longitude:pos.coords.longitude}); if(!result.places.length) throw new Error('附近找不到符合的地點。'); const items=result.places.slice(0,5);setLog(items.map(p=>`• ${p.name}（${p.distance}m）`).join('<br>'));speak(`附近有：${items.map(p=>`${p.name}，${p.distance}公尺`).join('，')}`);}catch(error){setLog(error.message);speak(error.message)}finally{processing=false} }
+function orientation(e){const value=e.webkitCompassHeading ?? (e.alpha == null ? null : 360-e.alpha);if(value!=null)heading.textContent=`方位：${Math.round(value)}°`;}
+async function unlock(){if(unlocked)return;unlocked=true;status.textContent='正在啟動相機…';setLog('正在請求相機權限…');await camera(facingMode);speak('ARGUS 已啟動。一下環境辨識，兩下切換鏡頭，長按搜尋附近地點。');if(typeof DeviceOrientationEvent!=='undefined'&&typeof DeviceOrientationEvent.requestPermission==='function'){try{if(await DeviceOrientationEvent.requestPermission()==='granted')addEventListener('deviceorientation',orientation,true)}catch{}}else addEventListener('deviceorientation',orientation,true);}
+function switchCamera(){facingMode=facingMode==='environment'?'user':'environment';camera(facingMode);speak('已切換鏡頭。');}
+document.body.addEventListener('pointerdown',()=>{if(!unlocked)return;longPress=false;pressTimer=setTimeout(()=>{longPress=true;speak('正在搜尋附近地點。');places();},1500)});
+document.body.addEventListener('pointerup',()=>{if(!unlocked){unlock();return;}clearTimeout(pressTimer);if(longPress)return;tapCount++;clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(tapCount===1)analyze();else if(tapCount===2)switchCamera();else if(tapCount===3){if(autoTimer){clearInterval(autoTimer);autoTimer=null;speak('自動辨識已關閉。')}else{autoTimer=setInterval(analyze,15000);speak('自動辨識已啟動。');analyze();}}tapCount=0;},450)});

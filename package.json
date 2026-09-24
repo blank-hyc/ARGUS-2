@@ -1,0 +1,13 @@
+{
+  "name": "argus-visionecho-fullstack",
+  "version": "1.0.0",
+  "private": true,
+  "description": "ARGUS VisionEcho with a browser client and a secure Node.js API.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
