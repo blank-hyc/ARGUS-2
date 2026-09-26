@@ -50,7 +50,7 @@ async function analyze(body) {
   if (!process.env.GEMINI_API_KEY) return { status: 503, data: { error: 'Gemini 尚未設定。請在伺服器的 .env 填入 GEMINI_API_KEY。' } };
   if (typeof body.image !== 'string' || !/^[A-Za-z0-9+/=]+$/.test(body.image)) return { status: 400, data: { error: '缺少有效的影像資料。' } };
   const prompt = typeof body.prompt === 'string' && body.prompt.length <= 500 ? body.prompt : 'Act as a visual assistant for a blind person. Describe the scene in under 18 words. State a traffic-light color first if visible. Reply with only the concise description.';
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${encodeURIComponent(process.env.GEMINI_API_KEY)}`, {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }, { inline_data: { mime_type: 'image/jpeg', data: body.image } }] }] })
   });
